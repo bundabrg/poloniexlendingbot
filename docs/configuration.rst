@@ -88,8 +88,14 @@ If ``spreadlend = 1`` and ``gapbottom = 0``, it will behave as simple lending bo
             - ``gapbottom`` and ``gaptop`` will be in percents of your balance. (A setting of 100 will equal 100%)
             - Example: You have 1BTC. If ``gapbottom = 100`` then you will skip 100% of your balance of dust offers, thus skipping 1BTC into the lendbook. If ``gaptop = 200`` then you will continue into the lendbook until you reach 200% of your balance, thus 2BTC. Then, if ``spreadlend = 5``, you will make 5 equal volume loans over that gap.
         - ``RawBTC`` - ``Gapbottom`` and ``Gaptop`` will be in a raw BTC value, converted to each coin.
+            - Recommended when using one-size-fits-all settings.
             - ``gapbottom`` and ``gaptop`` will be in BTC. (A setting of 3 will equal 3 BTC)
             - Example: If ``gapbottom = 1`` and you are currently lending ETH, the bot will check the current exchange rate, say 1BTC = 10ETH. Then the bot will skip 10ETH of dust offers at the bottom of the lendbook before lending. If ``gaptop = 10``, then using the same exchange rate 10BTC will be 100ETH. The bot will then continue 100ETH into the loanbook before stopping. Then, if ``spreadlend = 5``, you will make 5 equal volume loans over that gap.
+        - ``Raw`` - ``Gapbottom`` and ``Gaptop`` will be in a raw value of the coin being lent.
+            - Recommended when used with coin-specific settings.
+            - ``gapbottom`` and ``gaptop`` will be in value of the coin. (A setting of 3 will equal 3 BTC, 3 ETH, 3 DOGE, or whatever coin is being lent.)
+            - Example: If ``gapbottom = 1`` and you are currently lending ETH, the bot will skip 1ETH of dust offers at the bottom of the lendbook before lending. If ``gaptop = 10``, the bot will then continue 10ETH into the loanbook before stopping. Then, if ``spreadlend = 5``, you will make 5 equal volume loans over that gap.
+
 
 
 - ``gapbottom`` is the lower setting for your ``gapMode`` values, and will be where you start to lend.
@@ -271,6 +277,9 @@ Configuration should look like this::
     maxtolend = 0
     maxpercenttolend = 0
     maxtolendrate = 0
+    gapmode = raw
+    gapbottom = 10
+    gaptop = 20
 
 
 Advanced logging and Web Display
@@ -452,3 +461,4 @@ You then need to visit this `documentation page <https://docs.pushbullet.com/#li
     pushbullet = True
     pushbullet_token = l.2mDDvy4RRdzcQN9LEWSy22amS7u3LJZ1
     pushbullet_deviceid = ujpah72o0sjAoRtnM0jb
+
