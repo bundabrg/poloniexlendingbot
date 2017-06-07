@@ -172,15 +172,16 @@ def create_lend_offer(currency, amt, rate):
 
 def cancel_all():
     loan_offers = api.return_open_loan_offers()
-    available_balances = api.return_available_account_balances('lending')
+    #available_balances = api.return_available_account_balances('lending')
+    lending_balances = return_lendable_balances()['lendable']
     for CUR in loan_offers:
         if CUR in coin_cfg and coin_cfg[CUR]['maxactive'] == 0:
             # don't cancel disabled coin
             continue
         if keep_stuck_orders:
-            lending_balances = available_balances['lending']
+            #lending_balances = available_balances
             if isinstance(lending_balances, dict) and CUR in lending_balances:
-                cur_sum = float(available_balances['lending'][CUR])
+                cur_sum = float(lending_balances[CUR])
             else:
                 cur_sum = 0
             for offer in loan_offers[CUR]:
@@ -202,18 +203,19 @@ def cancel_all():
 
 def lend_all():
     total_lent = Data.get_total_lent()[0]
-    lending_balances = api.return_available_account_balances("lending")['lending']
+    #lending_balances = api.return_available_account_balances("lending")['lending']
+    lending_balances = return_lendable_balances()
     if dry_run:  # just fake some numbers, if dryrun (testing)
         lending_balances = Data.get_on_order_balances()
 
     # Fill the (maxToLend) balances on the botlog.json for display it on the web
     for cur in sorted(total_lent):
-        if len(lending_balances) == 0 or cur not in lending_balances:
+        if len(lending_balances['lendable']) == 0 or cur not in lending_balances['lendable']:
             MaxToLend.amount_to_lend(total_lent[cur], cur, 0, 0)
     usable_currencies = 0
     global sleep_time  # We need global var to edit sleeptime
     try:
-        for cur in lending_balances:
+        for cur in lending_balances['lendable']:
             usable_currencies += lend_cur(cur, total_lent, lending_balances)
     except StopIteration:  # Restart lending if we stop to raise the request limit.
         lend_all()
@@ -318,7 +320,7 @@ def construct_orders(cur, cur_active_bal, cur_total_balance):
 
 
 def lend_cur(active_cur, total_lent, lending_balances):
-    active_cur_total_balance = Decimal(lending_balances[active_cur])
+    active_cur_total_balance = Decimal(lending_balances['lendable'][active_cur])
     if active_cur in total_lent:
         active_cur_total_balance += Decimal(total_lent[active_cur])
 
@@ -331,14 +333,16 @@ def lend_cur(active_cur, total_lent, lending_balances):
     if not order_book or len(order_book['rates']) == 0 or not cur_min_daily_rate:
         return 0
 
-    active_bal = MaxToLend.amount_to_lend(active_cur_total_balance, active_cur, Decimal(lending_balances[active_cur]),
+    active_bal = MaxToLend.amount_to_lend(active_cur_total_balance, active_cur, Decimal(lending_balances['lendable'][active_cur]),
                                           Decimal(order_book['rates'][0]))
 
     if float(active_bal) > get_min_loan_size(active_cur):  # Make sure sleeptimer is set to active if any cur can lend.
         currency_usable = 1
     else:
         return 0  # Return early to end function.
-
+        
+    
+        
     orders = construct_orders(active_cur, active_bal, active_cur_total_balance)  # Construct all the potential orders
     i = 0
     while i < len(orders['amounts']):  # Iterate through prepped orders and create them if they work
@@ -353,6 +357,9 @@ def lend_cur(active_cur, total_lent, lending_balances):
             rate = orders['rates'][i]
 
         try:
+            # Transfer funds to lending account if needed
+            prepare_lending_balance(active_cur, Decimal(orders['amounts'][i]).quantize(Decimal('0.00000001')), lending_balances)
+        
             create_lend_offer(active_cur, orders['amounts'][i], rate)
         except Exception as msg:
             if "Amount must be at least " in str(msg):
@@ -371,6 +378,8 @@ def lend_cur(active_cur, total_lent, lending_balances):
 
 
 def transfer_balances():
+    # Disabled for now
+    return
     # Transfers all balances on the included list to Lending.
     if len(transferable_currencies) > 0:
         exchange_balances = api.return_balances()  # This grabs only exchange balances.
@@ -382,3 +391,80 @@ def transfer_balances():
                 log.notify(log.digestApiMsg(msg), notify_conf)
             if coin not in exchange_balances:
                 print "ERROR: Incorrect coin entered for transferCurrencies: " + coin
+
+
+def return_lendable_balances():
+    # Enumerate available balances from all accounts that we can potentially use for lending
+    
+    
+    balances = {
+        'lendable': {},
+        'account': {}
+    }
+    
+    
+    # Get all available balances in all accounts.
+    available_balances = api.return_available_account_balances('all')
+    
+    for account in available_balances:
+    
+        for cur in available_balances[account]:
+            # If account is not 'lending', then we only count the balance if it is part of
+            # transferable_currencies
+            if account != 'lending' and cur not in transferable_currencies:
+                continue
+                
+            if account not in balances['account']:
+                balances['account'][account] = {}
+        
+            if cur not in balances['lendable']:
+                balances['lendable'][cur] = Decimal('0.0')
+            
+            if cur not in balances['account'][account]:
+                balances['account'][account][cur] = Decimal('0.0')
+                
+            
+            balances['lendable'][cur] += Decimal(available_balances[account][cur])
+            balances['account'][account][cur] += Decimal(available_balances[account][cur])
+    
+    return balances
+            
+def prepare_lending_balance(cur, balance, lending_balances):
+    # Ensure the available balance in the lending account for cur is at least equal to balance. If not, we will
+    # attempt to transfer it from somewhere else
+    
+    print "We need", balance, "in lending account for", cur
+    
+    if 'lending' not in lending_balances['account'] or cur not in lending_balances['account']['lending']:
+        needed_balance = balance
+    else:
+        needed_balance = balance - lending_balances['account']['lending'][cur]
+    
+    if needed_balance < Decimal('0.0'):
+        print "We have enough"
+        return
+        
+    if cur not in transferable_currencies:
+        print "Not a transferable currency. Skipping"
+        return
+        
+        
+    # Go through each account, apart from lending, and see if we can transfer
+    for account in lending_balances['account']:
+        if account == 'lending':
+            continue
+            
+        if cur not in lending_balances['account'][account] or lending_balances['account'][account][cur] == Decimal('0.0'):
+            continue
+            
+        transfer_amount = min(lending_balances['account'][account][cur], needed_balance)
+        
+        msg = api.transfer_balance(cur, transfer_amount, account, 'lending')
+        log.log(log.digestApiMsg(msg))
+        log.notify(log.digestApiMsg(msg), notify_conf)
+        
+        needed_balance -= transfer_amount
+        if needed_balance <= Decimal('0.0'):
+            print "We now have enough"
+            break
+            
