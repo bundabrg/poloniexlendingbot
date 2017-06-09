@@ -78,8 +78,6 @@ try:
             PluginsManager.before_lending()
             Lending.transfer_balances()
             FundManager.update()
-            # DEBUG: 
-            print FundManager.available_balance('BTC')
             Lending.cancel_all()
             Lending.lend_all()
             PluginsManager.after_lending()
