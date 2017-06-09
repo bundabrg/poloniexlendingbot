@@ -12,6 +12,7 @@ import modules.Configuration as Config
 import modules.Data as Data
 import modules.Lending as Lending
 import modules.MaxToLend as MaxToLend
+import modules.FundManager as FundManager
 from modules.Logger import Logger
 from modules.Poloniex import Poloniex, PoloniexApiError
 import modules.PluginsManager as PluginsManager
@@ -56,6 +57,7 @@ if Config.has_option('BOT', 'analyseCurrencies'):
     analysis.run()
 else:
     analysis = None
+FundManager.init(Config, api, log, notify_conf)
 Lending.init(Config, api, log, Data, MaxToLend, dry_run, analysis, notify_conf)
 
 # load plugins
@@ -75,6 +77,9 @@ try:
             Data.update_conversion_rates(output_currency, json_output_enabled)
             PluginsManager.before_lending()
             Lending.transfer_balances()
+            FundManager.update()
+            # DEBUG: 
+            print FundManager.available_balance('BTC')
             Lending.cancel_all()
             Lending.lend_all()
             PluginsManager.after_lending()
