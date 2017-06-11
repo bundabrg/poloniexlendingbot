@@ -33,8 +33,10 @@ class OpenOrderFund(FundManager.BaseFund):
             
                 if order['type'] == 'sell':
                     cur = right_cur
+                    order['pair_amount'] = Decimal(order['amount'])
                 else:
                     cur = left_cur
+                    order['pair_amount'] = Decimal(order['total'])
             
                 if cur not in self.orders:
                     self.orders[cur] = []
@@ -56,7 +58,7 @@ class OpenOrderFund(FundManager.BaseFund):
         if cur not in self.orders:
             return Decimal('0.0')
         
-        return sum([Decimal(order['amount']) for order in self.orders[cur]])
+        return sum([Decimal(order['pair_amount']) for order in self.orders[cur]])
         
     def prepare(self, cur, account, balance):
         """
@@ -69,16 +71,16 @@ class OpenOrderFund(FundManager.BaseFund):
         while len(self.orders[cur]) and balance > Decimal('0.0'):
             order = self.orders[cur].pop(0)
 
-            transfer_amount = min(Decimal(order['amount']), balance)
+            transfer_amount = min(Decimal(order['pair_amount']), balance)
         
             if transfer_amount > Decimal('0.0'):
-                print("  - Cancelling order for {:.8f} of coin {:s} and transfering {:.8f} to {:s}".format(Decimal(order['amount']), cur, transfer_amount, account))
+                print("  - Cancelling order for {:.8f} of coin {:s} and transfering {:.8f} to {:s}".format(Decimal(order['pair_amount']), cur, transfer_amount, account))
                 msg = self.api.cancel(order['pair'], order['orderNumber'])
                 self.log.log(self.log.digestApiMsg(msg))
                 self.log.notify(self.log.digestApiMsg(msg), self.notify_conf)
             
                 msg = self.api.transfer_balance(cur, transfer_amount, 'exchange', account)
-                FundManager.add_balance(cur, 'exchange', Decimal(order['amount'])-transfer_amount)
+                FundManager.add_balance(cur, 'exchange', Decimal(order['pair_amount'])-transfer_amount)
                 
                 self.log.log(self.log.digestApiMsg(msg))
                 self.log.notify(self.log.digestApiMsg(msg), self.notify_conf)

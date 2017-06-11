@@ -120,7 +120,7 @@ def prepare(cur, account, balance):
         
     total_needed = Decimal(balance)
     
-    print("I need {:.8f} of coin {:s} in account {:a}".format(total_needed, cur, account))
+    print("I need {:.8f} of coin {:s} in account {:s}".format(total_needed, cur, account))
         
     for priority in sorted(funds):
         for fund in funds[priority]:
