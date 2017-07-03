@@ -350,19 +350,23 @@ def lend_cur(active_cur, total_lent, balance):
         
     orders = construct_orders(active_cur, active_bal, active_cur_total_balance)  # Construct all the potential orders
     i = 0
+    carry = 0
     while i < len(orders['amounts']):  # Iterate through prepped orders and create them if they work
         below_min = Decimal(orders['rates'][i]) < Decimal(cur_min_daily_rate)
 
         if hide_coins and below_min:
-            log.log("Not lending {:s} due to rate below {:.4f}% (actual: {:.4f}%)".format(active_cur,(cur_min_daily_rate * 100),(orders['rates'][i] * 100)))
-            return 0
+            carry += orders['amounts'][i]
+            #log.log("Not lending {:s} due to rate below {:.4f}% (actual: {:.4f}%)".format(active_cur,(cur_min_daily_rate * 100),(orders['rates'][i] * 100)))
+            i += 1
+            continue
         elif below_min:
             rate = str(cur_min_daily_rate)
         else:
             rate = orders['rates'][i]
 
         # Quantize the amount
-        order_amount = Decimal(orders['amounts'][i]).quantize(Decimal('0.00000001'))
+        order_amount = Decimal(orders['amounts'][i]+carry).quantize(Decimal('0.00000001'))
+        carry = 0
 
         try:
             # Prepare lending account for the amount
@@ -389,6 +393,10 @@ def lend_cur(active_cur, total_lent, balance):
                 raise msg
 
         i += 1  # Finally, move to next order.
+        
+    if carry:
+        log.log("Not lending {:s} due to rate below {:.4f}% (actual: {:.4f}%)".format(active_cur,(cur_min_daily_rate * 100),(orders['rates'][-1] * 100)))
+
     return currency_usable
 
 
