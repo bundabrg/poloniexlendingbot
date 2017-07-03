@@ -198,6 +198,8 @@ def cancel_all():
                     try:
                         msg = api.cancel_loan_offer(CUR, offer['id'])
                         log.cancelOrders(CUR, msg)
+                        FundManager.add_balance(CUR, 'lending', Decimal(offer['amount']))
+                        #def add_balance(cur, account, balance):
                     except Exception as ex:
                         ex.message = ex.message if ex.message else str(ex)
                         log.log("Error canceling loan offer: {0}".format(ex.message))
