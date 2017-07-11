@@ -156,11 +156,16 @@ class AccountFund(BaseFund):
     def update(self,name=None):
         if name is None or name == self.account:
             print("DEBUG: Updating Account Fund for: %s" % self.account)
-            self.balance = self.api.return_available_account_balances(self.account)[self.account]
+            balance = self.api.return_available_account_balances(self.account)[self.account]
             
             # Empty seems to return a list??
-            if isinstance(self.balance, list):
-                self.balance = {}
+            if isinstance(balance, list):
+                balance = {}
+            
+            # Decimalize it
+            self.balance = {k: Decimal(v) for k,v in balance.iteritems()}
+            
+            
         
     def currencies(self):
         """

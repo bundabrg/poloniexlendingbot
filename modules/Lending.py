@@ -203,6 +203,11 @@ def cancel_all():
                     except Exception as ex:
                         ex.message = ex.message if ex.message else str(ex)
                         log.log("Error canceling loan offer: {0}".format(ex.message))
+                        
+                        import traceback, sys
+                        print "*** print_exception:"
+                        traceback.print_exc(file=sys.stdout)
+                        
         else:
             print "Not enough " + CUR + " to lend if bot canceled open orders. Not cancelling."
 
@@ -357,7 +362,7 @@ def lend_cur(active_cur, total_lent, balance):
         below_min = Decimal(orders['rates'][i]) < Decimal(cur_min_daily_rate)
 
         if hide_coins and below_min:
-            carry += orders['amounts'][i]
+            #carry += orders['amounts'][i]
             #log.log("Not lending {:s} due to rate below {:.4f}% (actual: {:.4f}%)".format(active_cur,(cur_min_daily_rate * 100),(orders['rates'][i] * 100)))
             i += 1
             continue
