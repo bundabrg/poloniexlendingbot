@@ -7,17 +7,11 @@ import time
 import urllib
 import urllib2
 import threading
-import calendar
+import modules.Configuration as Config
 
 from modules.RingBuffer import RingBuffer
-
-
-class PoloniexApiError(Exception):
-    pass
-
-
-def create_time_stamp(datestr, formatting="%Y-%m-%d %H:%M:%S"):
-    return calendar.timegm(time.strptime(datestr, formatting))
+from modules.ExchangeApi import ExchangeApi
+from modules.ExchangeApi import ApiError
 
 
 def post_process(before):
@@ -29,54 +23,39 @@ def post_process(before):
             for x in xrange(0, len(after['return'])):
                 if isinstance(after['return'][x], dict):
                     if 'datetime' in after['return'][x] and 'timestamp' not in after['return'][x]:
-                        after['return'][x]['timestamp'] = float(create_time_stamp(after['return'][x]['datetime']))
+                        after['return'][x]['timestamp'] = float(ExchangeApi.create_time_stamp(after['return'][x]['datetime']))
 
     return after
 
 
-def synchronized(method):
-    """ Work with instance method only !!! """
-
-    def new_method(self, *arg, **kws):
-        with self.lock:
-            return method(self, *arg, **kws)
-
-
-    return new_method
-
-
-class Poloniex:
-    def __init__(self, api_key, secret):
-        self.APIKey = api_key
-        self.Secret = secret
-        self.req_per_sec = 6
-        self.req_time_log = RingBuffer(self.req_per_sec)
+class Poloniex(ExchangeApi):
+    def __init__(self, cfg, log):
+        super(Poloniex, self).__init__(cfg, log)
+        self.cfg = cfg
+        self.log = log
+        self.APIKey = self.cfg.get("API", "apikey", None)
+        self.Secret = self.cfg.get("API", "secret", None)
+        self.req_per_period = 6
+        self.default_req_period = 1000  # milliseconds
+        self.req_period = self.default_req_period
+        self.req_time_log = RingBuffer(self.req_per_period)
         self.lock = threading.RLock()
-        socket.setdefaulttimeout(30)
+        socket.setdefaulttimeout(int(Config.get("BOT", "timeout", 30, 1, 180)))
+        self.api_debug_log = self.cfg.getboolean("BOT", "api_debug_log")
 
-    @synchronized
     def limit_request_rate(self):
-        now = time.time()
-        # start checking only when request time log is full
-        if len(self.req_time_log) == self.req_per_sec:
-            time_since_oldest_req = now - self.req_time_log[0]
-            # check if oldest request is more than 1sec ago
-            if time_since_oldest_req < 1:
-                # print self.req_time_log.get()
-                # uncomment to debug
-                # print "Waiting %s sec to keep api request rate" % str(1 - time_since_oldest_req)
-                # print "Req: %d  6th Req: %d  Diff: %f sec" %(now, self.req_time_log[0], time_since_oldest_req)
-                self.req_time_log.append(now + 1 - time_since_oldest_req)
-                time.sleep(1 - time_since_oldest_req)
-                return
-            # uncomment to debug
-            # else:
-            #     print self.req_time_log.get()
-            #     print "Req: %d  6th Req: %d  Diff: %f sec" % (now, self.req_time_log[0], time_since_oldest_req)
-        # append current request time to the log, pushing out the 6th request time before it
-        self.req_time_log.append(now)
+        super(Poloniex, self).limit_request_rate()
 
-    @synchronized
+    def increase_request_timer(self):
+        super(Poloniex, self).increase_request_timer()
+
+    def decrease_request_timer(self):
+        super(Poloniex, self).decrease_request_timer()
+
+    def reset_request_timer(self):
+        super(Poloniex, self).reset_request_timer()
+
+    @ExchangeApi.synchronized
     def api_query(self, command, req=None):
         # keep the 6 request per sec limit
         self.limit_request_rate()
@@ -85,10 +64,10 @@ class Poloniex:
             req = {}
 
         def _read_response(resp):
-            data = json.loads(resp.read())
-            if 'error' in data:
-                raise PoloniexApiError(data['error'])
-            return data
+            resp_data = json.loads(resp.read())
+            if 'error' in resp_data:
+                raise ApiError(resp_data['error'])
+            return resp_data
 
         try:
             if command == "returnTicker" or command == "return24hVolume":
@@ -104,9 +83,10 @@ class Poloniex:
                         req['currencyPair'])))
                 return _read_response(ret)
             elif command == "returnLoanOrders":
-                req_url = 'https://poloniex.com/public?command=' + "returnLoanOrders" + '&currency=' + str(req['currency'])
-                if req['limit'] != '':
-                    req_url += '&limit=' + str(req['limit'])
+                req_url = ('https://poloniex.com/public?command=' + "returnLoanOrders"
+                           + '&currency=' + str(req['currency']))
+                if req['limit'] > 0:
+                    req_url += ('&limit=' + str(req['limit']))
                 ret = urllib2.urlopen(urllib2.Request(req_url))
                 return _read_response(ret)
             else:
@@ -123,15 +103,27 @@ class Poloniex:
                 ret = urllib2.urlopen(urllib2.Request('https://poloniex.com/tradingApi', post_data, headers))
                 json_ret = _read_response(ret)
                 return post_process(json_ret)
+
+            # Check in case something has gone wrong and the timer is too big
+            self.reset_request_timer()
+
         except urllib2.HTTPError as ex:
+            raw_polo_response = ex.read()
             try:
-                data = json.loads(ex.read())
+                data = json.loads(raw_polo_response)
                 polo_error_msg = data['error']
             except:
-                polo_error_msg = None
+                if hasattr(ex, 'code') and (ex.code == 502 or ex.code in range(520, 527, 1)):
+                    # 502 and 520-526 Bad Gateway so response is likely HTML from Cloudflare
+                    polo_error_msg = 'API Error ' + str(ex.code) + \
+                                     ': The web server reported a bad gateway or gateway timeout error.'
+                elif hasattr(ex, 'code') and (ex.code == 429):
+                    self.increase_request_timer()
+                else:
+                    polo_error_msg = raw_polo_response
             ex.message = ex.message if ex.message else str(ex)
             ex.message = "{0} Requesting {1}.  Poloniex reports: '{2}'".format(ex.message, command, polo_error_msg)
-            raise
+            raise ex
         except Exception as ex:
             ex.message = ex.message if ex.message else str(ex)
             ex.message = "{0} Requesting {1}".format(ex.message, command)
@@ -154,7 +146,7 @@ class Poloniex:
                                                   'toAccount': to_account})
 
     # Returns all of your balances.
-    # Outputs: 
+    # Outputs:
     # {"BTC":"0.59098578","LTC":"3.31117268", ... }
     def return_balances(self):
         return self.api_query('returnBalances')
@@ -168,7 +160,7 @@ class Poloniex:
     # Returns your open orders for a given market, specified by the "currencyPair" POST parameter, e.g. "BTC_XCP"
     # Inputs:
     # currencyPair  The currency pair e.g. "BTC_XCP"
-    # Outputs: 
+    # Outputs:
     # orderNumber   The order number
     # type          sell or buy
     # rate          Price the order is selling or buying at
@@ -192,7 +184,7 @@ class Poloniex:
     # Returns your trade history for a given market, specified by the "currencyPair" POST parameter
     # Inputs:
     # currencyPair  The currency pair e.g. "BTC_XCP"
-    # Outputs: 
+    # Outputs:
     # date          Date in the form: "2014-02-19 03:44:59"
     # rate          Price the order is selling or buying at
     # amount        Quantity of order
@@ -207,7 +199,7 @@ class Poloniex:
     # currencyPair  The curreny pair
     # rate          price the order is buying at
     # amount        Amount of coins to buy
-    # Outputs: 
+    # Outputs:
     # orderNumber   The order number
     def buy(self, currency_pair, rate, amount):
         return self.api_query('buy', {"currencyPair": currency_pair, "rate": rate, "amount": amount})
@@ -218,7 +210,7 @@ class Poloniex:
     # currencyPair  The curreny pair
     # rate          price the order is selling at
     # amount        Amount of coins to sell
-    # Outputs: 
+    # Outputs:
     # orderNumber   The order number
     def sell(self, currency_pair, rate, amount):
         return self.api_query('sell', {"currencyPair": currency_pair, "rate": rate, "amount": amount})
@@ -232,7 +224,7 @@ class Poloniex:
     # Inputs:
     # currencyPair  The curreny pair
     # orderNumber   The order number to cancel
-    # Outputs: 
+    # Outputs:
     # succes        1 or 0
     def cancel(self, currency_pair, order_number):
         return self.api_query('cancelOrder', {"currencyPair": currency_pair, "orderNumber": order_number})
@@ -247,12 +239,12 @@ class Poloniex:
     # currency      The currency to withdraw
     # amount        The amount of this coin to withdraw
     # address       The withdrawal address
-    # Outputs: 
+    # Outputs:
     # response      Text containing message about the withdrawal
     def withdraw(self, currency, amount, address):
         return self.api_query('withdraw', {"currency": currency, "amount": amount, "address": address})
 
-    def return_loan_orders(self, currency, limit=''):
+    def return_loan_orders(self, currency, limit=0):
         return self.api_query('returnLoanOrders', {"currency": currency, "limit": limit})
 
     # Toggles the auto renew setting for the specified orderNumber

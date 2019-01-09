@@ -22,7 +22,7 @@
     <link rel="apple-touch-startup-image" href="images/ios_splash.png">
     <meta name="apple-mobile-web-app-capable" content="yes">
 
-    <title>Poloniex Lending Bot</title>
+    <title>Lending Bot</title>
 
     <!-- Bootstrap Core CSS -->
     <link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet">
@@ -96,14 +96,14 @@
                 </button>
                 <img src="images/icon192.png" height="32" width="32" style="margin-top: 8px;margin-right: 8px;margin-left: -15px;vertical-align:top">
                 <div style="display:inline-block">
-                    <h4 class="brand-margin">Poloniex Lending Bot</h4>
+                    <h4 class="brand-margin" id="title">Lending Bot</h4>
                     <h5 class="brand-margin" id="updated">Not updated</h5>
                 </div>
             </div>
 
             <!-- Collect the nav links, forms, and other content for toggling -->
             <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
-                <ul class="nav navbar-nav navbar-right">
+                <ul class="nav navbar-nav navbar-right" id="navbar-menu">
                     <li id="file" data-toggle="collapse" data-target=".navbar-collapse.in">
                         <a href="#" onclick="$('#input-file').trigger('click');">
                             <i class="glyphicon glyphicon-file"></i>
@@ -213,7 +213,7 @@
 
                         <div class="form-group">
                             <h5>Effective loan rates calculation</h5>
-                            <p class="small">Effective rate can either take into consideration the actual amount actively lent OR consider only Poloniex 15% fee</p>
+                            <p class="small">Effective rate can either take into consideration the actual amount actively lent OR consider only exchange 15% fee</p>
                             <label class="radio-inline">
                                 <input value="lentperc" type="radio" name="effRateMode"> Fee and Effective Lent
                             </label>

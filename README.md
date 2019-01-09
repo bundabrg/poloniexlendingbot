@@ -1,19 +1,21 @@
-# Poloniex lending bot <img src="https://nevet.me/public/icon.png" width="50">
+# Mika Lending Bot <img src="https://nevet.me/public/icon.png" width="50">
 
-The Poloniex lending bot is written in Python and features automatic lending on the exchange Poloniex.
+Mika Lending Bot is written in Python and features automatic lending on exchanges Poloniex and Bitfinex.
 It will automatically lend all cryptocurrencies found in your lending account.
 
 It uses an advanced lending strategy which will spread offers across the lend book to take advantage of possible spikes in lending rates. Inspired by [MarginBot](https://github.com/HFenter/MarginBot) and [BitfinexLendingBot](https://github.com/eAndrius/BitfinexLendingBot).
 
-Join the discussion at: 
+Join the discussion at:
 
 [![Join the chat at https://gitter.im/Mikadily/poloniexlendingbot](https://badges.gitter.im/Mikadily/poloniexlendingbot.svg)](https://gitter.im/Mikadily/poloniexlendingbot?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
-[<img src='https://dokkur.com/assets/images/docs_screens/telegram.png' width='100'>](https://t.me/mikalendingbot) 
+[<img src='https://dokkur.com/assets/images/docs_screens/telegram.png' width='100'>](https://t.me/mikalendingbot)
 
 [<img src='https://cdn.worldvectorlogo.com/logos/slack.svg' width='90'>](https://poloniexbot.slack.com/shared_invite/MTc5OTU4MDAzNTY4LTE0OTQzMTA2MzYtZDdkYTg1NjBkYg) **- Recommended for communicating with Devs**
 
 [<img src='https://www.redditstatic.com/spreddit1.gif'>Subreddit](https://www.reddit.com/r/poloniexlendingbot/) **- Recommended for focused discussion**
+
+We also have a public [FAQ on the Github Wiki](https://github.com/BitBotFactory/MikaLendingBot/wiki/FAQ-(Troubleshooting)), feel free to add your questions or check there for support! 
 
 Workflow management with Waffle.io
 
@@ -24,7 +26,7 @@ Workflow management with Waffle.io
 
 
 ### Features
-- Automatically lend your coins on Poloniex at the highest possible rates, 24 hours a day.
+- Automatically lend your coins on Poloniex and Bitfinex at the highest possible rates, 24 hours a day.
 - Configure your own lending strategy! Be aggressive and hold out for a great rate or be conservative and lend often but at a lower rate, your choice!
 - The ability to spread your offers out to take advantage of spikes in the lending rate.
 - Withhold lending a percentage of your coins until the going rate reaches a certain threshold to maximize your profits.
@@ -43,4 +45,4 @@ Workflow management with Waffle.io
 
 If you find it useful, please consider donating some bitcoins: 37VoSLbiqVWGDA5Y8rmo5XaQxPo551gBY8
 
-This address goes to a multisignature wallet with keys held by the lead contributors: Mikadily, rnevet, and Evanito.
+This address goes to a multisignature wallet with keys held by the lead contributors: Mikadily, rnevet and Evanito.

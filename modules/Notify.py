@@ -3,6 +3,15 @@ import urllib
 import urllib2
 import json
 import smtplib
+try:
+    from irc import client
+    IRC_LOADED = True
+except ImportError:
+    IRC_LOADED = False
+
+IRC_CLIENT = None
+IRC_SERVER = None
+
 
 # Slack post data needs to be encoded in UTF-8
 def encoded_dict(in_dict):
@@ -29,9 +38,9 @@ def check_urlib_response(response, platform):
         raise NotificationException(msg)
 
 
-def post_to_slack(msg, channels, token):
+def post_to_slack(msg, channels, token, username):
     for channel in channels:
-        post_data = {'text': msg, 'channel': channel, 'token': token}
+        post_data = {'text': msg, 'channel': channel, 'token': token, 'username': username}
         enc_post_data = urllib.urlencode(encoded_dict(post_data))
         url = 'https://{}/api/{}'.format('slack.com', 'chat.postMessage')
         response = urllib2.urlopen(url, enc_post_data)
@@ -76,25 +85,51 @@ def send_email(msg, email_login_address, email_login_password, email_smtp_server
         print("Could not send email, got error {0}".format(e))
         raise NotificationException(e)
 
+
 def post_to_pushbullet(msg, token, deviceid):
     post_data = {'body': msg, 'device_iden': deviceid, 'title': 'Poloniex Bot', 'type': 'note'}
     opener = urllib2.build_opener()
     req = urllib2.Request('https://api.pushbullet.com/v2/pushes', data=json.dumps(post_data),
                           headers={'Content-Type': 'application/json', 'Access-Token': token})
     try:
-        response = opener.open(req)
+        opener.open(req)
     except Exception as e:
         print("Could not send pushbullet, got error {0}".format(e))
         raise NotificationException(e)
 
-def send_notification(msg, notify_conf):
+
+def post_to_irc(msg, host, port, nick, ident, realname, target):
+    """
+    Log into an IRC server and send a message to a channel.
+    """
+    global IRC_CLIENT, IRC_SERVER
+    if IRC_CLIENT is None:
+        IRC_CLIENT = client.Reactor()
+        IRC_SERVER = IRC_CLIENT.server()
+
+    IRC_SERVER.connect(host, port, nick)
+    if client.is_channel(target):
+        IRC_SERVER.join(target)
+    for line in msg.splitlines():
+        IRC_SERVER.privmsg(target, line)
+
+
+def send_notification(_msg, notify_conf):
     nc = notify_conf
+    msg = _msg if ('notify_prefix' not in nc) else "{} {}".format(nc['notify_prefix'], _msg)
+
     if nc['email']:
         send_email(msg, nc['email_login_address'], nc['email_login_password'], nc['email_smtp_server'],
                    nc['email_smtp_port'], nc['email_to_addresses'], nc['email_smtp_starttls'])
     if nc['slack']:
-        post_to_slack(msg, nc['slack_channels'], nc['slack_token'])
+        post_to_slack(msg, nc['slack_channels'], nc['slack_token'], nc['slack_username'])
     if nc['telegram']:
         post_to_telegram(msg, nc['telegram_chat_ids'], nc['telegram_bot_id'])
     if nc['pushbullet']:
         post_to_pushbullet(msg, nc['pushbullet_token'], nc['pushbullet_deviceid'])
+    if nc['irc']:
+        if IRC_LOADED:
+            post_to_irc(msg, nc['irc_host'], nc['irc_port'], nc['irc_nick'], nc['irc_ident'], nc['irc_realname'],
+                        nc['irc_target'])
+        else:
+            print("IRC module not available, please run 'pip install irc'")

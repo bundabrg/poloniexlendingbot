@@ -1,5 +1,4 @@
 from plugins import *
-import plugins.Plugin as Plugin
 
 config = None
 api = None
@@ -32,8 +31,15 @@ def init(cfg, api1, log1, notify_conf1):
     notify_conf = notify_conf1
 
     plugin_names = config.get_plugins_config()
+    active_plugins = []
     for plugin_name in plugin_names:
-        plugins.append(init_plugin(plugin_name))
+        try:
+            plugins.append(init_plugin(plugin_name))
+            active_plugins.append(plugin_name)
+        except Exception as ex:
+            log.log_error('Failed to load plugin {}: {}'.format(plugin_name, ex.message))
+
+    log.addSectionLog("plugins", "enabled", active_plugins)
 
 
 def after_lending():
